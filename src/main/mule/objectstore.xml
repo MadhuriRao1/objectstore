@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="44b29f32-984c-4d38-83ef-cff2a1ffc4cf" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="root" database="employeedetails" />
+	</db:config>
+	<flow name="objectstoreFlow" doc:id="467f994c-b9ec-40ca-84de-4ed20a7a4ae4" >
+		<scheduler doc:name="Scheduler" doc:id="7044ba8b-1e8b-4a4a-abb5-bbd879b4a78a" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="2" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve doc:name="Retrieve" doc:id="ccd716d5-2db4-418a-831b-69bd5422e48d" key="lastrecord">
+			<os:default-value ><![CDATA[0]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="79848364-e352-4c11-9faa-db94b7044153" variableName="lastrecord"/>
+		<db:select doc:id="79a99041-64a9-4553-851e-8326e9489c83" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from account where accountId>:accId; ]]></db:sql>
+			<db:input-parameters ><![CDATA[#[accId:vars.lastrecord]]]></db:input-parameters>
+		</db:select>
+		<choice doc:name="Choice" doc:id="f7912fdc-06bb-45bc-a4e4-6907c1382151" >
+			<when expression="#[not isEmpty(payload)]">
+				<logger level="INFO" doc:name="Logger" doc:id="2f6e4232-b66b-40d0-a80f-b252b50e112c" message="payload received--------------#[payload]"/>
+				<ee:transform doc:name="Transform Message" doc:id="0d7d0df5-27ec-4d08-94d9-e9495318175c" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="29e0b4d0-16c3-4fed-8efc-d4d37b2ecd8f" message="response received from database------------#[payload]"/>
+				<os:store doc:name="Store" doc:id="cf7873f0-45ae-4095-a4ce-c33376090f5f" key="lastrecord">
+					<os:value ><![CDATA[#[max(payload.accountId)]]]></os:value>
+				</os:store>
+				<logger level="INFO" doc:name="Logger" doc:id="ff89c307-1154-4ade-97e1-fac7b8bef599" message="output-------------#[payload]"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="19d5e06d-d39d-4fb7-91f6-bc361a606c91" message="no records found"/>
+			</otherwise>
+		</choice>
+	</flow>
+</mule>
